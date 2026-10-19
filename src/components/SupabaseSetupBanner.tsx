@@ -27,9 +27,11 @@ export const SupabaseSetupBanner: React.FC = () => {
               <Database className="w-3.5 h-3.5" />
               Supabase 연동 중
             </span>
-            <span className="text-stone-300 hidden sm:inline">
-              프로젝트: <code className="bg-black/30 px-1.5 py-0.5 rounded text-emerald-200">josycwwlekamytlbeeph</code>
-            </span>
+            {SUPABASE_URL ? (
+              <span className="text-stone-300 hidden sm:inline">
+                연결 URL: <code className="bg-black/30 px-1.5 py-0.5 rounded text-emerald-200">{SUPABASE_URL.replace('https://', '')}</code>
+              </span>
+            ) : null}
             {isSupabaseTableMissing && (
               <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full text-[10px] font-semibold">
                 테이블 생성 스크립트 대기
@@ -46,12 +48,12 @@ export const SupabaseSetupBanner: React.FC = () => {
               <span>Supabase SQL 테이블 스크립트 보기</span>
             </button>
             <a
-              href={`https://supabase.com/dashboard/project/josycwwlekamytlbeeph/sql/new`}
+              href="https://supabase.com/dashboard"
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1 px-2.5 py-1 bg-white/10 hover:bg-white/20 text-stone-200 rounded-md transition-colors cursor-pointer"
             >
-              <span>Supabase SQL Editor 열기</span>
+              <span>Supabase 콘솔 열기</span>
               <ExternalLink className="w-3 h-3" />
             </a>
           </div>

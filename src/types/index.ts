@@ -58,6 +58,8 @@ export interface ConsultationSession {
   status: ConsultationStatus;
   teacherPrivateMemo?: string;
   followUpDate?: string;
+  attachmentUrl?: string;
+  attachmentName?: string;
   createdAt: string;
   updatedAt: string;
   messageCount?: number;
@@ -73,6 +75,8 @@ export interface ConsultationMessage {
   senderName: string;
   senderRole: UserRole;
   message: string;
+  attachmentUrl?: string;
+  attachmentName?: string;
   isRead: boolean;
   createdAt: string;
 }

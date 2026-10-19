@@ -379,6 +379,8 @@ export async function createConsultationSession(data: {
   urgency: string;
   currentMood: string;
   initialMessage: string;
+  attachmentUrl?: string;
+  attachmentName?: string;
 }) {
   try {
     const insertedSession = await db
@@ -392,19 +394,23 @@ export async function createConsultationSession(data: {
         urgency: data.urgency || 'normal',
         currentMood: data.currentMood || '답답함',
         status: 'pending',
+        attachmentUrl: data.attachmentUrl || null,
+        attachmentName: data.attachmentName || null,
       })
       .returning();
 
     const session = insertedSession[0];
 
     // Insert initial message
-    if (data.initialMessage) {
+    if (data.initialMessage || data.attachmentUrl) {
       await db.insert(consultationMessages).values({
         sessionId: session.id,
         senderUid: data.studentUid,
         senderName: data.studentName,
         senderRole: 'student',
-        message: data.initialMessage,
+        message: data.initialMessage || '(첨부파일 포함 상담 신청)',
+        attachmentUrl: data.attachmentUrl || null,
+        attachmentName: data.attachmentName || null,
       });
     }
 
@@ -414,7 +420,7 @@ export async function createConsultationSession(data: {
       await createNotification(
         teacher.uid,
         `🔔 [비밀상담 접수] ${data.studentName} 학생의 새 상담 신청`,
-        `[${data.urgency === 'urgent' ? '🚨긴급' : '상담'}] ${data.title}: "${data.initialMessage.substring(0, 35)}..."`,
+        `[${data.urgency === 'urgent' ? '🚨긴급' : '상담'}] ${data.title}: "${data.initialMessage ? data.initialMessage.substring(0, 35) : '파일 첨부 상담'}..."`,
         `/consultation/${session.id}`,
         'new_consultation'
       );
@@ -432,7 +438,9 @@ export async function addConsultationMessage(
   senderUid: string,
   senderName: string,
   senderRole: string,
-  message: string
+  message: string,
+  attachmentUrl?: string,
+  attachmentName?: string
 ) {
   try {
     const sessRows = await db
@@ -453,6 +461,8 @@ export async function addConsultationMessage(
         senderName,
         senderRole,
         message,
+        attachmentUrl: attachmentUrl || null,
+        attachmentName: attachmentName || null,
       })
       .returning();
 

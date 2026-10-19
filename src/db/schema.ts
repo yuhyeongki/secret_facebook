@@ -63,6 +63,8 @@ export const consultationSessions = pgTable('consultation_sessions', {
   status: text('status').notNull().default('pending'), // 'pending' (접수), 'in_progress' (상담중), 'completed' (상담완료), 'monitoring' (추후관찰)
   teacherPrivateMemo: text('teacher_private_memo').default(''), // 선생님만 볼 수 있는 비공개 관찰일지 및 상담 기록
   followUpDate: text('follow_up_date'), // 대면 상담 또는 사후 확인 예정일 (YYYY-MM-DD)
+  attachmentUrl: text('attachment_url'), // 첨부 이미지/파일 (Base64 or URL)
+  attachmentName: text('attachment_name'), // 첨부 파일명
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
@@ -77,6 +79,8 @@ export const consultationMessages = pgTable('consultation_messages', {
   senderName: text('sender_name').notNull(),
   senderRole: text('sender_role').notNull().default('student'), // 'student' | 'teacher'
   message: text('message').notNull(),
+  attachmentUrl: text('attachment_url'), // 메시지 첨부 파일
+  attachmentName: text('attachment_name'),
   isRead: boolean('is_read').notNull().default(false),
   createdAt: timestamp('created_at').defaultNow(),
 });

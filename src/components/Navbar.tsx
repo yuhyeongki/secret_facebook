@@ -14,8 +14,8 @@ import {
 } from 'lucide-react';
 
 interface NavbarProps {
-  currentTab: 'board' | 'consultation' | 'dashboard';
-  onTabChange: (tab: 'board' | 'consultation' | 'dashboard') => void;
+  currentTab: 'board' | 'apply' | 'consultation' | 'dashboard';
+  onTabChange: (tab: 'board' | 'apply' | 'consultation' | 'dashboard') => void;
   unreadCount: number;
   onOpenNotifications: () => void;
 }
@@ -73,6 +73,21 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             <button
+              onClick={() => onTabChange('apply')}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                currentTab === 'apply'
+                  ? 'bg-rose-600 text-white shadow-xs font-bold'
+                  : 'text-rose-700 hover:text-rose-900 hover:bg-rose-50 font-bold'
+              }`}
+            >
+              <Lock className="w-4 h-4" />
+              <span>상담 신청 (Apply)</span>
+              <span className="hidden lg:inline text-[11px] font-medium opacity-80">
+                (파일 업로드)
+              </span>
+            </button>
+
+            <button
               onClick={() => onTabChange('consultation')}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
                 currentTab === 'consultation'
@@ -80,9 +95,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                   : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
               }`}
             >
-              <Lock className="w-4 h-4 text-rose-600" />
-              <span>1:1 비밀 상담</span>
-              <span className="hidden md:inline text-xs font-normal text-stone-400">(선생님 전용)</span>
+              <MessageSquareHeart className="w-4 h-4 text-rose-600" />
+              <span>1:1 시크릿 대화</span>
             </button>
 
             {isTeacher && (

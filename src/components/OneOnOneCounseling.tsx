@@ -18,7 +18,11 @@ import {
   GraduationCap,
   MessageSquare,
   HelpCircle,
-  EyeOff,
+  Paperclip,
+  Image as ImageIcon,
+  FileText,
+  X,
+  ExternalLink,
 } from 'lucide-react';
 import { triggerPushAlert } from '../lib/push.ts';
 
@@ -43,9 +47,10 @@ const MOOD_OPTIONS = [
   { value: '괜찮아지는중', emoji: '🌱', label: '괜찮아지는 중' },
 ];
 
-export const OneOnOneCounseling: React.FC<{ activeSessionId?: number | null }> = ({
-  activeSessionId,
-}) => {
+export const OneOnOneCounseling: React.FC<{
+  activeSessionId?: number | null;
+  onOpenApplyTab?: () => void;
+}> = ({ activeSessionId, onOpenApplyTab }) => {
   const { getAuthToken, role, currentUser } = useAuth();
   const isTeacher = role === 'teacher';
 
@@ -55,18 +60,11 @@ export const OneOnOneCounseling: React.FC<{ activeSessionId?: number | null }> =
   const [loading, setLoading] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
 
-  // New consultation modal state
-  const [isNewModalOpen, setIsNewModalOpen] = useState(false);
-  const [reqTitle, setReqTitle] = useState('');
-  const [reqCategory, setReqCategory] = useState('학업/성적');
-  const [reqUrgency, setReqUrgency] = useState<'normal' | 'urgent' | 'emergency'>('normal');
-  const [reqMood, setReqMood] = useState('답답함');
-  const [reqMessage, setReqMessage] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  // Chat message input
+  // Quick Chat message & file upload
   const [messageText, setMessageText] = useState('');
+  const [chatAttachment, setChatAttachment] = useState<{ url: string; name: string } | null>(null);
   const [sendingMsg, setSendingMsg] = useState(false);
+  const chatFileInputRef = useRef<HTMLInputElement>(null);
 
   // Teacher quick update state
   const [teacherStatus, setTeacherStatus] = useState<string>('pending');
@@ -86,7 +84,6 @@ export const OneOnOneCounseling: React.FC<{ activeSessionId?: number | null }> =
         const data = await res.json();
         setSessions(data);
         if (!selectedSessionId && data.length > 0) {
-          // If desktop, preselect first
           setSelectedSessionId(data[0].id);
         }
       }
@@ -134,52 +131,27 @@ export const OneOnOneCounseling: React.FC<{ activeSessionId?: number | null }> =
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeSession?.messages]);
 
-  const handleCreateSession = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!reqTitle.trim() || !reqMessage.trim()) return;
-
-    setSubmitting(true);
-    try {
-      const token = await getAuthToken();
-      const res = await fetch('/api/consultations', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          title: reqTitle.trim(),
-          category: reqCategory,
-          urgency: reqUrgency,
-          currentMood: reqMood,
-          initialMessage: reqMessage.trim(),
-          studentName: currentUser?.name || '우리반 학생',
-          studentNumber: currentUser?.studentNumber || '',
-        }),
-      });
-
-      if (res.ok) {
-        const newSession = await res.json();
-        setIsNewModalOpen(false);
-        setReqTitle('');
-        setReqMessage('');
-        triggerPushAlert(
-          '1:1 비밀 상담이 신청되었습니다 🔒',
-          '선생님께 상담 요청이 전달되었습니다. 선생님께서 확인 후 즉시 답변을 남겨주실 거예요.'
-        );
-        await fetchSessions();
-        setSelectedSessionId(newSession.id);
+  const handleChatFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      if (file.size > 8 * 1024 * 1024) {
+        alert('파일은 최대 8MB까지 첨부할 수 있습니다.');
+        return;
       }
-    } catch (e) {
-      console.error('Failed to create consultation:', e);
-    } finally {
-      setSubmitting(false);
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        setChatAttachment({
+          url: evt.target?.result as string,
+          name: file.name,
+        });
+      };
+      reader.readAsDataURL(file);
     }
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!messageText.trim() || !selectedSessionId) return;
+    if ((!messageText.trim() && !chatAttachment) || !selectedSessionId) return;
 
     setSendingMsg(true);
     try {
@@ -191,14 +163,20 @@ export const OneOnOneCounseling: React.FC<{ activeSessionId?: number | null }> =
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          message: messageText.trim(),
+          message: messageText.trim() || (chatAttachment ? '파일 첨부' : ''),
           senderName: currentUser?.name || (isTeacher ? '담임선생님' : '학생'),
           senderRole: isTeacher ? 'teacher' : 'student',
+          attachmentUrl: chatAttachment?.url,
+          attachmentName: chatAttachment?.name,
         }),
       });
 
       if (res.ok) {
         setMessageText('');
+        setChatAttachment(null);
+        if (chatFileInputRef.current) {
+          chatFileInputRef.current.value = '';
+        }
         await fetchSessionDetail(selectedSessionId);
         await fetchSessions();
       }
@@ -246,23 +224,23 @@ export const OneOnOneCounseling: React.FC<{ activeSessionId?: number | null }> =
         <div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-100 text-rose-800 text-xs font-semibold mb-2">
             <Lock className="w-3.5 h-3.5" />
-            선생님과 1:1 비밀 상담창구
+            선생님과 1:1 시크릿 대화창구
           </div>
           <h2 className="text-xl sm:text-2xl font-extrabold text-stone-900 tracking-tight">
             선생님께만 보이는 1:1 비밀 대화 💌
           </h2>
           <p className="text-xs sm:text-sm text-stone-600 mt-1">
-            친구들에게는 보이지 않는 오직 선생님과 나만의 안전한 상담 공간입니다.
+            친구들에게는 전혀 보이지 않는 안전한 일대일 상담 대화방입니다.
           </p>
         </div>
 
-        {!isTeacher && (
+        {!isTeacher && onOpenApplyTab && (
           <button
-            onClick={() => setIsNewModalOpen(true)}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-xs transition-colors cursor-pointer shrink-0"
+            onClick={onOpenApplyTab}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 text-white text-xs sm:text-sm font-bold rounded-xl shadow-md shadow-rose-600/20 transition-all cursor-pointer shrink-0"
           >
             <Plus className="w-4 h-4" />
-            <span>비밀 상담 신청하기</span>
+            <span>비밀 상담 신청서 작성 (Apply)</span>
           </button>
         )}
       </div>
@@ -273,7 +251,7 @@ export const OneOnOneCounseling: React.FC<{ activeSessionId?: number | null }> =
         <div className={`lg:col-span-4 bg-white rounded-2xl border border-stone-200 shadow-xs flex flex-col ${selectedSessionId ? 'hidden lg:flex' : 'flex'}`}>
           <div className="p-4 border-b border-stone-200 flex items-center justify-between">
             <h3 className="font-bold text-stone-800 text-sm">
-              {isTeacher ? '접수된 학생 상담 목록' : '나의 상담 목록'} ({sessions.length})
+              {isTeacher ? '접수된 학생 상담 목록' : '나의 비밀 상담 목록'} ({sessions.length})
             </h3>
             <span className="text-[11px] text-stone-400">실시간 연동</span>
           </div>
@@ -290,8 +268,16 @@ export const OneOnOneCounseling: React.FC<{ activeSessionId?: number | null }> =
                 <p className="text-[11px] text-stone-400 mt-1">
                   {isTeacher
                     ? '학생들이 1:1 상담을 신청하면 이곳에 도착합니다.'
-                    : '고민이 있다면 언제든 선생님께 상담을 신청하세요.'}
+                    : '새로운 고민이 있다면 [비밀 상담 신청 (Apply)] 탭에서 접수하세요.'}
                 </p>
+                {!isTeacher && onOpenApplyTab && (
+                  <button
+                    onClick={onOpenApplyTab}
+                    className="mt-4 px-4 py-2 bg-rose-600 text-white text-xs font-bold rounded-xl hover:bg-rose-700 transition-colors"
+                  >
+                    상담 신청서 작성하기
+                  </button>
+                )}
               </div>
             ) : (
               sessions.map((sess) => {
@@ -324,6 +310,13 @@ export const OneOnOneCounseling: React.FC<{ activeSessionId?: number | null }> =
                     <h4 className="font-bold text-sm text-stone-900 leading-snug line-clamp-1">
                       {sess.title}
                     </h4>
+
+                    {sess.attachmentUrl && (
+                      <div className="mt-1 flex items-center gap-1 text-[11px] text-rose-700 font-semibold">
+                        <Paperclip className="w-3 h-3" />
+                        <span>첨부파일 포함</span>
+                      </div>
+                    )}
 
                     {isTeacher && (
                       <div className="mt-1 flex items-center gap-1.5 text-xs text-stone-600 font-medium">
@@ -394,6 +387,46 @@ export const OneOnOneCounseling: React.FC<{ activeSessionId?: number | null }> =
                 </div>
               </div>
 
+              {/* Initial Session Uploaded Attachment Banner (if exists) */}
+              {activeSession.attachmentUrl && (
+                <div className="p-3 bg-rose-50 border-b border-rose-200 flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    {activeSession.attachmentUrl.startsWith('data:image/') ? (
+                      <img
+                        src={activeSession.attachmentUrl}
+                        alt="첨부 이미지"
+                        className="w-10 h-10 rounded-lg object-cover border border-rose-300 shrink-0 cursor-pointer"
+                        onClick={() => {
+                          const w = window.open('');
+                          w?.document.write(`<img src="${activeSession.attachmentUrl}" style="max-width:100%" />`);
+                        }}
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-rose-200 text-rose-800 flex items-center justify-center shrink-0">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                    )}
+                    <div className="truncate">
+                      <div className="font-bold text-rose-950 flex items-center gap-1">
+                        <Paperclip className="w-3.5 h-3.5 text-rose-600" />
+                        <span>신청 시 첨부된 시크릿 파일:</span>
+                      </div>
+                      <span className="text-[11px] text-rose-800 truncate block">
+                        {activeSession.attachmentName || '첨부 문서/사진'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <a
+                    href={activeSession.attachmentUrl}
+                    download={activeSession.attachmentName || '상담첨부파일'}
+                    className="px-2.5 py-1 bg-white hover:bg-rose-100 border border-rose-300 text-rose-800 font-semibold rounded-lg text-xs shrink-0 cursor-pointer"
+                  >
+                    다운로드 / 크게보기
+                  </a>
+                </div>
+              )}
+
               {/* Teacher Private Observation Panel (Teacher View Only) */}
               {isTeacher && (
                 <div className="p-3.5 bg-amber-50/80 border-b border-amber-200 text-xs">
@@ -461,10 +494,9 @@ export const OneOnOneCounseling: React.FC<{ activeSessionId?: number | null }> =
 
               {/* Message List */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-stone-50/50 max-h-[460px]">
-                {/* Confidentiality Warning Note */}
-                <div className="mx-auto max-w-md p-2.5 rounded-xl bg-stone-100 border border-stone-200 text-center text-[11px] text-stone-500 flex items-center justify-center gap-1.5">
+                <div className="mx-auto max-w-md p-2 rounded-xl bg-stone-100 border border-stone-200 text-center text-[11px] text-stone-500 flex items-center justify-center gap-1.5">
                   <Lock className="w-3.5 h-3.5 text-stone-400" />
-                  <span>이 상담 내용은 선생님과 학생 본인만 열람할 수 있습니다.</span>
+                  <span>이 대화와 업로드 파일은 선생님과 학생 본인만 열람할 수 있습니다.</span>
                 </div>
 
                 {loadingMessages ? (
@@ -509,6 +541,30 @@ export const OneOnOneCounseling: React.FC<{ activeSessionId?: number | null }> =
                           }`}
                         >
                           {msg.message}
+
+                          {/* Render message attachment if present */}
+                          {msg.attachmentUrl && (
+                            <div className="mt-2 pt-2 border-t border-white/20">
+                              {msg.attachmentUrl.startsWith('data:image/') ? (
+                                <img
+                                  src={msg.attachmentUrl}
+                                  alt="첨부 이미지"
+                                  className="max-h-48 rounded-xl object-contain bg-black/5"
+                                />
+                              ) : (
+                                <a
+                                  href={msg.attachmentUrl}
+                                  download={msg.attachmentName || '첨부파일'}
+                                  className={`inline-flex items-center gap-1.5 p-2 rounded-lg text-xs font-semibold underline ${
+                                    isMe ? 'text-white' : 'text-rose-700'
+                                  }`}
+                                >
+                                  <Paperclip className="w-3.5 h-3.5" />
+                                  <span>{msg.attachmentName || '첨부파일 다운로드'}</span>
+                                </a>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -517,31 +573,65 @@ export const OneOnOneCounseling: React.FC<{ activeSessionId?: number | null }> =
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Chat Input */}
-              <form
-                onSubmit={handleSendMessage}
-                className="p-3 bg-white border-t border-stone-200 flex items-center gap-2"
-              >
-                <input
-                  type="text"
-                  value={messageText}
-                  onChange={(e) => setMessageText(e.target.value)}
-                  placeholder={
-                    isTeacher
-                      ? '학생에게 따뜻하고 든든한 조언과 격려를 남겨주세요...'
-                      : '선생님께 드릴 말씀을 편하게 적어주세요...'
-                  }
-                  className="flex-1 bg-stone-100 border border-stone-200 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-stone-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
-                />
-                <button
-                  type="submit"
-                  disabled={sendingMsg || !messageText.trim()}
-                  className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
-                >
-                  <Send className="w-4 h-4" />
-                  <span className="hidden sm:inline">전송</span>
-                </button>
-              </form>
+              {/* Chat Input & Attachment Toolbar */}
+              <div className="p-3 bg-white border-t border-stone-200">
+                {/* Pending attachment preview */}
+                {chatAttachment && (
+                  <div className="mb-2 p-2 bg-rose-50 border border-rose-200 rounded-xl flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2 truncate">
+                      <Paperclip className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                      <span className="font-semibold text-rose-900 truncate">
+                        {chatAttachment.name}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setChatAttachment(null)}
+                      className="p-1 text-stone-400 hover:text-stone-700"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    ref={chatFileInputRef}
+                    onChange={handleChatFileSelect}
+                    accept="image/*,.pdf,.txt"
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => chatFileInputRef.current?.click()}
+                    className="p-2.5 text-stone-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer shrink-0"
+                    title="사진 또는 파일 첨부"
+                  >
+                    <Paperclip className="w-4 h-4" />
+                  </button>
+
+                  <input
+                    type="text"
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
+                    placeholder={
+                      isTeacher
+                        ? '학생에게 따뜻하고 든든한 조언과 격려를 남겨주세요...'
+                        : '선생님께 드릴 말씀을 적어주세요 (사진/파일 첨부 가능)...'
+                    }
+                    className="flex-1 bg-stone-100 border border-stone-200 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-stone-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500"
+                  />
+                  <button
+                    type="submit"
+                    disabled={sendingMsg || (!messageText.trim() && !chatAttachment)}
+                    className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
+                  >
+                    <Send className="w-4 h-4" />
+                    <span className="hidden sm:inline">전송</span>
+                  </button>
+                </form>
+              </div>
             </>
           ) : (
             <div className="m-auto py-24 text-center text-stone-400">
@@ -554,173 +644,6 @@ export const OneOnOneCounseling: React.FC<{ activeSessionId?: number | null }> =
           )}
         </div>
       </div>
-
-      {/* New Consultation Request Modal */}
-      {isNewModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-stone-200 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between pb-3 border-b border-stone-200">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-rose-100 text-rose-800 rounded-xl">
-                  <Lock className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-stone-900 text-base">
-                    선생님께 비밀 1:1 상담 신청
-                  </h3>
-                  <p className="text-xs text-stone-500">
-                    오직 담임 선생님만 열람할 수 있습니다.
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsNewModalOpen(false)}
-                className="p-1.5 text-stone-400 hover:text-stone-700 rounded-lg hover:bg-stone-100"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateSession} className="mt-4 space-y-4">
-              {/* Category */}
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  상담 분야
-                </label>
-                <select
-                  value={reqCategory}
-                  onChange={(e) => setReqCategory(e.target.value)}
-                  className="w-full px-3 py-2 border border-stone-200 rounded-xl text-xs text-stone-900 bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20"
-                >
-                  <option value="학업/성적">학업 및 성적 고민</option>
-                  <option value="교우관계">친구 및 교우 관계</option>
-                  <option value="진로상담">진로 및 미래 진학</option>
-                  <option value="정서/심리">마음 건강 및 정서적 어려움</option>
-                  <option value="가정문제">가정 및 개인사</option>
-                  <option value="학교생활">학교 생활 적응</option>
-                  <option value="긴급상담">🚨 긴급 도움이 필요해요</option>
-                  <option value="기타">기타 고민</option>
-                </select>
-              </div>
-
-              {/* Urgency */}
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  상담의 긴급도
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setReqUrgency('normal')}
-                    className={`p-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
-                      reqUrgency === 'normal'
-                        ? 'border-stone-500 bg-stone-100 text-stone-900 ring-2 ring-stone-400/20'
-                        : 'border-stone-200 text-stone-600 hover:bg-stone-50'
-                    }`}
-                  >
-                    일반 상담
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setReqUrgency('urgent')}
-                    className={`p-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
-                      reqUrgency === 'urgent'
-                        ? 'border-amber-500 bg-amber-50 text-amber-900 ring-2 ring-amber-400/20'
-                        : 'border-stone-200 text-stone-600 hover:bg-stone-50'
-                    }`}
-                  >
-                    조금 힘들어요
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setReqUrgency('emergency')}
-                    className={`p-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
-                      reqUrgency === 'emergency'
-                        ? 'border-rose-600 bg-rose-50 text-rose-900 ring-2 ring-rose-500/20'
-                        : 'border-stone-200 text-stone-600 hover:bg-stone-50'
-                    }`}
-                  >
-                    🚨 긴급 필요
-                  </button>
-                </div>
-              </div>
-
-              {/* Mood picker */}
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  현재 내 마음 상태
-                </label>
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-                  {MOOD_OPTIONS.map((m) => (
-                    <button
-                      key={m.value}
-                      type="button"
-                      onClick={() => setReqMood(m.value)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1 shrink-0 transition-all cursor-pointer ${
-                        reqMood === m.value
-                          ? 'bg-rose-100 text-rose-900 border border-rose-300 font-bold'
-                          : 'bg-stone-50 border border-stone-200 text-stone-600 hover:bg-stone-100'
-                      }`}
-                    >
-                      <span>{m.emoji}</span>
-                      <span>{m.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Title */}
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  상담 제목
-                </label>
-                <input
-                  type="text"
-                  value={reqTitle}
-                  onChange={(e) => setReqTitle(e.target.value)}
-                  placeholder="예: 성적 때문에 너무 불안하고 집중이 안 돼요"
-                  className="w-full px-3 py-2 border border-stone-200 rounded-xl text-xs text-stone-900 focus:outline-none focus:ring-2 focus:ring-rose-500/20"
-                  maxLength={60}
-                  required
-                />
-              </div>
-
-              {/* Message */}
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  상담 내용
-                </label>
-                <textarea
-                  value={reqMessage}
-                  onChange={(e) => setReqMessage(e.target.value)}
-                  placeholder="선생님께 전하고 싶은 마음을 편안하게 적어주세요. 선생님께서 비밀을 지키며 정성껏 도와주실 거예요."
-                  rows={4}
-                  className="w-full px-3 py-2 border border-stone-200 rounded-xl text-xs text-stone-900 focus:outline-none focus:ring-2 focus:ring-rose-500/20 resize-none"
-                  required
-                />
-              </div>
-
-              {/* Buttons */}
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsNewModalOpen(false)}
-                  className="px-4 py-2 border border-stone-200 text-stone-600 hover:bg-stone-50 text-xs font-semibold rounded-xl cursor-pointer"
-                >
-                  취소
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting || !reqTitle.trim() || !reqMessage.trim()}
-                  className="px-5 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
-                >
-                  {submitting ? '신청 중...' : '비밀 상담 신청하기'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

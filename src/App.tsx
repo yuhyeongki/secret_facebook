@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext.tsx';
 import { Navbar } from './components/Navbar.tsx';
 import { AnonymousBoard } from './components/AnonymousBoard.tsx';
 import { OneOnOneCounseling } from './components/OneOnOneCounseling.tsx';
+import { ApplyConsultationTab } from './components/ApplyConsultationTab.tsx';
 import { TeacherDashboard } from './components/TeacherDashboard.tsx';
 import { NotificationDrawer } from './components/NotificationDrawer.tsx';
 import { SupabaseSetupBanner } from './components/SupabaseSetupBanner.tsx';
@@ -10,7 +11,7 @@ import { HeartHandshake, PhoneCall, ShieldCheck, Lock, Sparkles } from 'lucide-r
 
 function CounselingApp() {
   const { role } = useAuth();
-  const [currentTab, setCurrentTab] = useState<'board' | 'consultation' | 'dashboard'>('board');
+  const [currentTab, setCurrentTab] = useState<'board' | 'apply' | 'consultation' | 'dashboard'>('board');
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [isNotificationOpen, setIsNotificationOpen] = useState<boolean>(false);
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
@@ -54,8 +55,19 @@ function CounselingApp() {
       {/* Main View Area */}
       <main className="flex-1 pb-16">
         {currentTab === 'board' && <AnonymousBoard />}
+        {currentTab === 'apply' && (
+          <ApplyConsultationTab
+            onSuccess={(newSessionId) => {
+              setActiveSessionId(newSessionId);
+              setCurrentTab('consultation');
+            }}
+          />
+        )}
         {currentTab === 'consultation' && (
-          <OneOnOneCounseling activeSessionId={activeSessionId} />
+          <OneOnOneCounseling
+            activeSessionId={activeSessionId}
+            onOpenApplyTab={() => setCurrentTab('apply')}
+          />
         )}
         {currentTab === 'dashboard' && (
           <TeacherDashboard onNavigateToSession={handleNavigateToSessionFromDashboard} />

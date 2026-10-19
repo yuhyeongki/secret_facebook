@@ -1,10 +1,19 @@
 import { createClient } from '@supabase/supabase-js';
 
-export const SUPABASE_URL = 'https://josycwwlekamytlbeeph.supabase.co';
-export const SUPABASE_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impvc3ljd3dsZWthbXl0bGJlZXBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MDMyNjEsImV4cCI6MjEwNzk3OTI2MX0.eQdtBuHkcUwzaGzeYfDEc3303_wuHL3zsyrckBQq_M8';
+export const SUPABASE_URL =
+  (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_SUPABASE_URL) ||
+  process.env.VITE_SUPABASE_URL ||
+  '';
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+export const SUPABASE_ANON_KEY =
+  (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_SUPABASE_ANON_KEY) ||
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  '';
+
+export const supabase =
+  SUPABASE_URL && SUPABASE_ANON_KEY
+    ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : createClient('https://placeholder-project.supabase.co', 'placeholder-anon-key');
 
 // SQL script ready for Supabase SQL Editor
 export const SUPABASE_SCHEMA_SQL = `-- 우리반 비밀 상담소 Supabase 테이블 생성 스크립트
@@ -68,6 +77,8 @@ CREATE TABLE IF NOT EXISTS public.consultation_sessions (
   status TEXT DEFAULT 'pending' NOT NULL,
   teacher_private_memo TEXT DEFAULT '',
   follow_up_date TEXT,
+  attachment_url TEXT,
+  attachment_name TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
@@ -80,6 +91,8 @@ CREATE TABLE IF NOT EXISTS public.consultation_messages (
   sender_name TEXT NOT NULL,
   sender_role TEXT DEFAULT 'student' NOT NULL,
   message TEXT NOT NULL,
+  attachment_url TEXT,
+  attachment_name TEXT,
   is_read BOOLEAN DEFAULT false NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );

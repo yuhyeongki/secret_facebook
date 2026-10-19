@@ -30,7 +30,8 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
 // ----------------- API ROUTES -----------------
 
@@ -177,10 +178,20 @@ app.get('/api/consultations/:id', requireAuth, async (req: AuthRequest, res) => 
 app.post('/api/consultations', requireAuth, async (req: AuthRequest, res) => {
   try {
     const uid = req.user?.uid!;
-    const { studentName, studentNumber, title, category, urgency, currentMood, initialMessage } = req.body;
+    const {
+      studentName,
+      studentNumber,
+      title,
+      category,
+      urgency,
+      currentMood,
+      initialMessage,
+      attachmentUrl,
+      attachmentName,
+    } = req.body;
 
-    if (!title || !initialMessage) {
-      return res.status(400).json({ error: '상담 제목과 고민 내용을 모두 입력해주세요.' });
+    if (!title || (!initialMessage && !attachmentUrl)) {
+      return res.status(400).json({ error: '상담 제목과 내용을 입력해주세요.' });
     }
 
     const session = await createConsultationSession({
@@ -191,7 +202,9 @@ app.post('/api/consultations', requireAuth, async (req: AuthRequest, res) => {
       category: category || '일반상담',
       urgency: urgency || 'normal',
       currentMood: currentMood || '답답함',
-      initialMessage,
+      initialMessage: initialMessage || '',
+      attachmentUrl,
+      attachmentName,
     });
 
     res.json(session);
@@ -205,10 +218,10 @@ app.post('/api/consultations/:id/messages', requireAuth, async (req: AuthRequest
   try {
     const sessionId = parseInt(req.params.id, 10);
     const uid = req.user?.uid!;
-    const { senderName, senderRole, message } = req.body;
+    const { senderName, senderRole, message, attachmentUrl, attachmentName } = req.body;
 
-    if (!message || !message.trim()) {
-      return res.status(400).json({ error: '메시지를 입력해주세요.' });
+    if ((!message || !message.trim()) && !attachmentUrl) {
+      return res.status(400).json({ error: '메시지 또는 첨부파일을 입력해주세요.' });
     }
 
     const savedMsg = await addConsultationMessage(
@@ -216,7 +229,9 @@ app.post('/api/consultations/:id/messages', requireAuth, async (req: AuthRequest
       uid,
       senderName || '참여자',
       senderRole || 'student',
-      message.trim()
+      (message || '').trim(),
+      attachmentUrl,
+      attachmentName
     );
 
     res.json(savedMsg);
