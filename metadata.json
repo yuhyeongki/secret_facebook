@@ -1,0 +1,6 @@
+{
+  "name": "우리반 비밀 상담소",
+  "description": "학생들의 익명 고민 나눔 게시판과 선생님과의 비밀 1:1 상담, 실시간 알림 및 체계적인 학생별 상담 이력 관리 시스템",
+  "requestFramePermissions": ["notifications"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
