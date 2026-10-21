@@ -118,11 +118,52 @@ ALTER TABLE public.consultation_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.consultation_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Allow public all access on users" ON public.users FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow public all access on anonymous_posts" ON public.anonymous_posts FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow public all access on post_reactions" ON public.post_reactions FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow public all access on post_comments" ON public.post_comments FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow public all access on consultation_sessions" ON public.consultation_sessions FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow public all access on consultation_messages" ON public.consultation_messages FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow public all access on notifications" ON public.notifications FOR ALL USING (true) WITH CHECK (true);
+-- 정책 중복 오류 방지 DO 블록
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow all on users') THEN
+    CREATE POLICY "Allow all on users" ON public.users FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow all on anonymous_posts') THEN
+    CREATE POLICY "Allow all on anonymous_posts" ON public.anonymous_posts FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow all on post_reactions') THEN
+    CREATE POLICY "Allow all on post_reactions" ON public.post_reactions FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow all on post_comments') THEN
+    CREATE POLICY "Allow all on post_comments" ON public.post_comments FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow all on consultation_sessions') THEN
+    CREATE POLICY "Allow all on consultation_sessions" ON public.consultation_sessions FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow all on consultation_messages') THEN
+    CREATE POLICY "Allow all on consultation_messages" ON public.consultation_messages FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow all on notifications') THEN
+    CREATE POLICY "Allow all on notifications" ON public.notifications FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
+
+-- 8. 성능 최적화 인덱스
+CREATE INDEX IF NOT EXISTS idx_posts_created ON public.anonymous_posts (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_posts_category ON public.anonymous_posts (category);
+CREATE INDEX IF NOT EXISTS idx_consultation_student ON public.consultation_sessions (student_uid);
+CREATE INDEX IF NOT EXISTS idx_consultation_updated ON public.consultation_sessions (updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_session ON public.consultation_messages (session_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_notifications_recipient ON public.notifications (recipient_uid, is_read);
+
+-- 9. 실시간 대화 및 알림을 위한 Realtime 활성화
+ALTER PUBLICATION supabase_realtime ADD TABLE public.consultation_messages, public.notifications, public.anonymous_posts;
+
+-- 10. 초기 기본 계정 및 환영 글
+INSERT INTO public.users (uid, email, name, role, student_number)
+VALUES
+  ('teacher-megayhk', 'megayhk@gmail.com', '김선생님 (담임교사)', 'teacher', '1학년 3반 담임'),
+  ('student-haneul', 'student_haneul@school.kr', '김하늘', 'student', '1학년 3반 14번')
+ON CONFLICT (uid) DO NOTHING;
+
+INSERT INTO public.anonymous_posts (author_uid, nickname, category, title, content, empathy_count, is_anonymous)
+VALUES
+  ('teacher-megayhk', '담임선생님 🍎', '학교생활', '우리반 비밀 상담소에 온 것을 환영합니다! 🌱', '학업, 진로, 친구 관계, 가족 문제 등 어떤 고민이든 혼자 끙끙 앓지 말고 편하게 털어놓으세요. 마음 우체통은 완전 익명으로, 1:1 상담은 선생님에게만 비밀로 전달됩니다.', 5, false)
+ON CONFLICT DO NOTHING;
 `;
